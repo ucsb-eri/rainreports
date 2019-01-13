@@ -14,6 +14,7 @@ Have a couple goals with the expanded approach here:
 * Create a website to make the various daily PDFs available
 * Compress the PDF's and store in a sqlite DB
   * DB should have some utilities to be able to bin dates up based on Y, or YM date stamps
+  * Use readline() functionality in sqlite 3.8.x+ https://www.sqlite.org/cli.html#fileio
 * python,,phpphp or bash script to manually load PDFs into the sqlite DB.
 * bash script to fetch daily PDFs to store in a data dir outside of the repo tree.
 
