@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+# want to add some command line args 
+# in particular: --silent
+executable="$0"
+exe=`basename $executable`
+errs="/tmp/${exe}-errs.$$"
+debug=
+v=1
+url=http://www.countyofsb.org/uploadedFiles/pwd/Content/Water/Documents/rainfallreport.pdf
+curl=`command -v curl`
+wget=`command -v wget`
+[ -n "$wget" ] && type=wget
+[ -n "$curl" ] && type=curl
+
+RAINFALL_REPORTS_DIR=${RAINFALL_REPORTS_DIR:-~/rainfallreports}
+[ ! -d "${RAINFALL_REPORTS_DIR}" ] && mkdir "${RAINFALL_REPORTS_DIR}"
+[ ! -d "${RAINFALL_REPORTS_DIR}" ] && { echo "failed to create dir: ${RAINFALL_REPORTS_DIR}"; exit 1; }
+
+################################################################################
+myExit(){
+    [ "$debug" ]&& echo "housecleaning"
+    [ "$2" ] && echo "$2" >&2
+    [ -f $errs ] && { echo "Found the following errors:" ; cat $errs >&2 ; }
+    rm -rf /tmp/${exe}-*.$$
+    [ "$debug" ] && echo "exit($1)"
+    exit $1
+}
+################################################################################
+# The following collection is likely most current in zfsutil
+# Even at that the -o in vecho may not be the best way to do that, ideally update
+# v to verbose or gVERBOSE or VERBOSE in everything...
+################################################################################
+vecho(){
+    [ -n "$verbose" -o -n "$v" ] && echo "$@" || return 0
+}
+################################################################################
+decho(){
+    [ -n "$debug" ] && echo "debug: " "$@" || return 0
+}
+################################################################################
+techo(){
+    [ -n "$TEST_MODE" ] && echo "TESTMODE: " "$@" || return 0
+}
+################################################################################
+# echo to stderr
+eecho(){
+    echo "$@" 1>&2;
+}
+################################################################################
+deecho(){
+    [ -n "$debug" ] && eecho "$@" || return 0
+}
+################################################################################
+rfru_help(){
+    thelp=/tmp/${exe}-help.$$
+
+    echo "$usage"
+    echo "  --verbose - verbose output turned on"
+    echo "  --debug   - debugging output turned on"
+    echo ""
+    echo "where subcommand is one of the following:"
+
+    # see if invoked with absolute or relative path
+    if [ -x $0 ]; then
+        self=$0
+    fi
+
+    # check path entries to see about finding
+    for pentry in `echo $PATH | tr ':' ' '`
+    do
+        if [ -f ${pentry}/$exe ]; then
+            self=${pentry}/$exe
+        fi
+    done
+
+    subcommand_prefix="rfru_"
+    if [ "$self" ]; then
+        sclist=`grep ')' $self | egrep "$subcommand_prefix" | grep -v '(' | cut -d ')' -f 1 | tr -d ' ' | grep -v '^[-*]'`
+        echo "" > $thelp
+        for sc in $sclist
+        do
+            printf "  $sc\n"
+            #regex="'^#.*${subcommand_prefix}${sc}'"
+            #egrep -E $regex $self >> $thelp
+            #egrep -E $regex $self
+            #echo "$regex"
+        done
+        cat $thelp
+        #regex="^# ${subcommand_prefix}'"
+
+        # would be cool to use something like the following to get the longest subcommand
+        longestsc=`echo "$sclist" | xargs -n1  -i sh -c 'echo \`echo -n {} | wc -c\`' | sort -n | tail -1`
+        #echo "sclist $sclist, longestsc: $longestsc"
+
+        egrep "^# ${subcommand_prefix}" $self | sed -e "s/^# ${subcommand_prefix}//" > $thelp
+    else
+        echo "error finding self, PATH must not be set correctly"
+    fi
+    echo ""
+
+    #echo "thelp: $thelp"
+    #cat "$thelp"
+
+    # this almost works, the trick will be dealing with continuation lines, preserving
+    # spaces will likely help...  Thus the IFS, Hmmmm, whitespace around separator seems to get lost
+    oIFS=$IFS
+    IFS='^'
+    while read "subc" "text" ; do
+        [ $subc ] && sep=" - " || sep="   "
+        #var1=`echo "$helpline" | cut -d' - ' -f1`
+        #var2=`echo "$helpline" | cut -d' - ' -f2-`
+        printf "  %-${longestsc}s%s%s\n" "$subc" "$text"
+    done < "$thelp"
+    IFS="$oIFS"
+
+}
+################################################################################
+rfru_fetch(){
+    cd "${RAINFALL_REPORTS_DIR}"
+    [ $? -eq 0 ] || { echo "failed to cd to dir: ${RAINFALL_REPORTS_DIR}"; exit 1; }
+    tmp=./rainfall.tmp
+    case $type in 
+        curl)
+            $curl --output $tmp $url > /dev/null 2>&1
+            ;;
+        wget)
+            ;;
+    esac
+    updated=`pdftotext -raw $tmp - | egrep '^Updated '`
+    #echo "Updated: $updated"
+    wrongDateStamp=`echo "$updated" | sed -e 's/^Updated [0-9]*[ap]m: //' -e 's/ Water Year.*$//'`
+    m=`echo "$wrongDateStamp" | cut -d/ -f1`
+    d=`echo "$wrongDateStamp" | cut -d/ -f2`
+    y=`echo "$wrongDateStamp" | cut -d/ -f3`
+    #echo "dscomponents: $y $m $d"
+    ds=`printf '%04d%02d%02d' "$y" "$m" "$d"`
+    dsname=rainfallreport-$ds.pdf
+
+    [ -e "$dsname" ] && vecho "rainfallreport for $ds already exists." || { vecho "new rainfallreport $dsname fetched to ${RAINFALL_REPORTS_DIR}!"; mv $tmp $dsname; }
+}
+v=1
+while [ $# -ge 1 ]; do
+    case $1 in
+        -v)                  v=1 ;;
+        --verbose)           v=1 ;;
+        -d)                  debug=1 ;;
+        --debug)             debug=1 ;;
+        --silent)            v= ;;
+        *)                   break ;;
+    esac
+    shift
+done
+
+if [ $# -eq 0 ]; then
+    subcommand=fetch
+else
+    subcommand=$1
+    shift
+fi
+
+case $subcommand in
+    list)                 rfru_list ;;
+    init)                 rfru_init ;;
+    fetch)                rfru_fetch ;;
+    status)               rfru_status ;;
+    help)                 rfru_help "$@" ;;
+    *)                    help; myExit 1 ;;
+esac
+
+myExit 0
