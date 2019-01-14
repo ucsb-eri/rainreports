@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# want to add some command line args 
+# want to add some command line args
 # in particular: --silent
 executable="$0"
 exe=`basename $executable`
@@ -15,6 +15,8 @@ wget=`command -v wget`
 RAINFALL_REPORTS_DIR=${RAINFALL_REPORTS_DIR:-~/rainfallreports}
 [ ! -d "${RAINFALL_REPORTS_DIR}" ] && mkdir "${RAINFALL_REPORTS_DIR}"
 [ ! -d "${RAINFALL_REPORTS_DIR}" ] && { echo "failed to create dir: ${RAINFALL_REPORTS_DIR}"; exit 1; }
+
+SQLITE=sqlite3
 
 ################################################################################
 myExit(){
@@ -119,7 +121,7 @@ rfru_fetch(){
     cd "${RAINFALL_REPORTS_DIR}"
     [ $? -eq 0 ] || { echo "failed to cd to dir: ${RAINFALL_REPORTS_DIR}"; exit 1; }
     tmp=./rainfall.tmp
-    case $type in 
+    case $type in
         curl)
             $curl --output $tmp $url > /dev/null 2>&1
             ;;
@@ -138,6 +140,67 @@ rfru_fetch(){
 
     [ -e "$dsname" ] && vecho "rainfallreport for $ds already exists." || { vecho "new rainfallreport $dsname fetched to ${RAINFALL_REPORTS_DIR}!"; mv $tmp $dsname; }
 }
+################################################################################
+# gzip the files in prep for db insertion
+rfru_gzip(){
+    printf ''
+}
+################################################################################
+rfru_init(){
+    [ -n "$db" ] || myExit 1 "db not set, exiting"
+
+sql="
+DROP TABLE IF EXISTS rainreports;
+DROP VIEW IF EXISTS rr;
+CREATE TABLE IF NOT EXISTS rainreports (ds text PRIMARY KEY NOT NULL, ymds text, year text, pdfz blob, UNIQUE(ds) ON CONFLICT REPLACE);
+CREATE VIEW IF NOT EXISTS rr AS SELECT ds,ymds,year FROM rainreports;
+"
+
+echo "$sql" | $SQLITE "$db"
+}
+################################################################################
+rfru_dbCheck(){
+    [ -n "$db" ] || myExit 1 "db not set, exiting"
+}
+################################################################################
+# need to decide how we are gonna derive the date, either reparse the PDF, or
+# rely on naming convention.
+################################################################################
+rfru_import(){
+    [ -n "$db" ] || myExit 1 "db not set, exiting"
+    rfru_dbCheck
+    for pdf in "$@"; do
+        # check to see if file is compressed, based purely on filename
+        echo "$pdf" | grep -q '.*\.pdf$'
+        origPDF=$?
+        echo "$pdf" | grep -q '.*\.pdf.gz$'
+        gzipped=$?
+
+        ds=`echo "$pdf" | sed -e 's/^.*\(20[12][0-9][0-9][0-9][0-9][0-9]\)\.pdf.*$/\1/'`
+        year=`echo "$pdf" | sed -e 's/^.*\(20[12][0-9]\)[0-9][0-9][0-9][0-9]\.pdf.*$/\1/'`
+        ymds=`echo "$pdf" | sed -e 's/^.*\(20[12][0-9][0-9][0-9]\)[0-9][0-9]\.pdf.*$/\1/'`
+
+        if [ $gzipped ]; then
+            if [ $origPDF ]; then
+                echo "file is PDF, needs gzipping"
+                pdfz="$pdf.gz"
+                gzip --stdout $pdf > $pdfz
+                sql="INSERT INTO rainreports(ds,ymds,year,pdfz) VALUES ('$ds','$ymds','$year',readfile('$pdfz'));"
+                echo "$sql" | $SQLITE "$db"
+                rm $pdfz
+                #echo "$sql"
+            else
+                echo "file is not PDF and not gzipped, so not sure what we were passed"
+            fi
+        else
+            echo "gzipped already: can just drop into db"
+            sql="INSERT INTO rainreports(ds,ymds,year,pdfz) VALUES ('$ds','$ymds','$year',readfile('$pdf'));"
+            echo "$sql" | $SQLITE "$db"
+        fi
+        echo "$pdf: $origPDF, $gzipped"
+    done
+}
+################################################################################
 v=1
 while [ $# -ge 1 ]; do
     case $1 in
@@ -145,6 +208,7 @@ while [ $# -ge 1 ]; do
         --verbose)           v=1 ;;
         -d)                  debug=1 ;;
         --debug)             debug=1 ;;
+        --db=*)              db=`echo "$1" | cut -d= -f2-` ;;
         --silent)            v= ;;
         *)                   break ;;
     esac
@@ -162,6 +226,8 @@ case $subcommand in
     list)                 rfru_list ;;
     init)                 rfru_init ;;
     fetch)                rfru_fetch ;;
+    gzip)                 rfru_gzip "$@" ;;
+    import)               rfru_import "$@" ;;
     status)               rfru_status ;;
     help)                 rfru_help "$@" ;;
     *)                    help; myExit 1 ;;
