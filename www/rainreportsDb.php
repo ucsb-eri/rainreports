@@ -17,16 +17,21 @@
     </p>
 
 <?php
-define('REPORTS_DIR','/home/rainreports/data/');
-foreach (glob(REPORTS_DIR . 'rainfallreport*.pdf',0) as $filename){
-    $file = basename($filename);
-    $url="data/$file";
-    print "<a href=\"$url\">$file</a><br />\n";
+
+define('REPORTS_DB','/home/rainreports/rainreports.sqlite3');
+
+require_once('./inc/rainreportsDb.class.php');
+
+$pdo = new SQLitePDO(REPORTS_DB);
+$pdo->myq();
+$pdo->dsList();
+if ($pdo->inDsList('20190113')){
+    $pdo->fetchDs('20190113');
 }
+$pdo->inDsList('20180923');
+
+
 
 ?>
-<p>
-New DB based version in development at: <a href="rainreportsDb.php">rainreportsDb.php</a>
-</p>
 </body>
 </html>
