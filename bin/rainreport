@@ -139,6 +139,9 @@ rfru_fetch(){
     dsname=rainfallreport-$ds.pdf
 
     [ -e "$dsname" ] && vecho "rainfallreport for $ds already exists." || { vecho "new rainfallreport $dsname fetched to ${RAINFALL_REPORTS_DIR}!"; mv $tmp $dsname; }
+
+    # if we have specified a db file during fetch, go ahead and import into db as well
+    [ -n "$db" -a -f "$db" ] && rfru_import ${RAINFALL_REPORTS_DIR}/$dsname
 }
 ################################################################################
 # gzip the files in prep for db insertion
@@ -160,14 +163,14 @@ echo "$sql" | $SQLITE "$db"
 }
 ################################################################################
 rfru_dbCheck(){
-    [ -n "$db" ] || myExit 1 "db not set, exiting"
+    [ -n "$db" -a -f "$db" ] || myExit 1 "db not set or doesn't exist, exiting"
 }
 ################################################################################
 # need to decide how we are gonna derive the date, either reparse the PDF, or
 # rely on naming convention.
 ################################################################################
 rfru_import(){
-    [ -n "$db" ] || myExit 1 "db not set, exiting"
+    [ -n "$db" -a -f "$db" ] || myExit 1 "db not set or doesn't exist, exiting"
     rfru_dbCheck
     for pdf in "$@"; do
         # check to see if file is compressed, based purely on filename
@@ -190,14 +193,14 @@ rfru_import(){
                 rm $pdfz
                 #echo "$sql"
             else
-                echo "file is not PDF and not gzipped, so not sure what we were passed"
+                decho "file is not PDF and not gzipped, so not sure what we were passed"
             fi
         else
-            echo "gzipped already: can just drop into db"
+            decho "gzipped already: can just drop into db"
             sql="INSERT INTO rainreports(ds,ymds,year,pdfz) VALUES ('$ds','$ymds','$year',readfile('$pdf'));"
             echo "$sql" | $SQLITE "$db"
         fi
-        echo "$pdf: $origPDF, $gzipped"
+        decho "$pdf: $origPDF, $gzipped"
     done
 }
 ################################################################################
