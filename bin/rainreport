@@ -185,7 +185,7 @@ rfru_import(){
 
         if [ $gzipped ]; then
             if [ $origPDF ]; then
-                echo "file is PDF, needs gzipping"
+                decho "file is PDF, needs gzipping"
                 pdfz="$pdf.gz"
                 gzip --stdout $pdf > $pdfz
                 sql="INSERT INTO rainreports(ds,ymds,year,pdfz) VALUES ('$ds','$ymds','$year',readfile('$pdfz'));"
