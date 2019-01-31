@@ -141,7 +141,10 @@ rfru_fetch(){
     [ -e "$dsname" ] && vecho "rainfallreport for $ds already exists." || { vecho "new rainfallreport $dsname fetched to ${RAINFALL_REPORTS_DIR}!"; mv $tmp $dsname; }
 
     # if we have specified a db file during fetch, go ahead and import into db as well
-    [ -n "$db" -a -f "$db" ] && rfru_import ${RAINFALL_REPORTS_DIR}/$dsname
+    if [ -n "$db" ]; then
+        [ -f "$db" ] || rfru_init
+        rfru_import ${RAINFALL_REPORTS_DIR}/$dsname
+    fi
 }
 ################################################################################
 # gzip the files in prep for db insertion
@@ -173,6 +176,7 @@ rfru_import(){
     [ -n "$db" -a -f "$db" ] || myExit 1 "db not set or doesn't exist, exiting"
     rfru_dbCheck
     for pdf in "$@"; do
+        [ -f "$pdf" ] || { echo "$pdf not found"; continue; }
         # check to see if file is compressed, based purely on filename
         echo "$pdf" | grep -q '.*\.pdf$'
         origPDF=$?
@@ -213,6 +217,7 @@ while [ $# -ge 1 ]; do
         --debug)             debug=1 ;;
         --db=*)              db=`echo "$1" | cut -d= -f2-` ;;
         --silent)            v= ;;
+        --help)              rfru_help; myExit 1 ;;
         *)                   break ;;
     esac
     shift
@@ -233,7 +238,7 @@ case $subcommand in
     import)               rfru_import "$@" ;;
     status)               rfru_status ;;
     help)                 rfru_help "$@" ;;
-    *)                    help; myExit 1 ;;
+    *)                    rfru_help; myExit 1 ;;
 esac
 
 myExit 0
