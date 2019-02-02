@@ -33,5 +33,9 @@ $pdo->inDsList('20180923');
 
 
 ?>
+<p>
+Older FS based version at: <a href="rainreportsDb.php">rainreportsFS.php</a>
+</p>
+
 </body>
 </html>
