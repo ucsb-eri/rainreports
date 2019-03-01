@@ -5,6 +5,23 @@ class SQLitePDO extends PDO {
         $filename = realpath($filename);
         parent::__construct('sqlite:' . $filename);
     }
+    function getYearList(){
+        $yearlist = array();
+        $stmt = $this->prepare('SELECT DISTINCT year FROM rr ORDER by ds DESC;');
+        $stmt->execute();
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // print "<pre>\n";
+        // print_r($result);
+        // print "</pre>\n";
+
+        foreach($result as $row){
+            $yearlist[] = $row['year'];
+        }
+        // print "<pre>\n";
+        // print_r($yearlist);
+        // print "</pre>\n";
+        return $yearlist;
+    }
     function myq(){
         $stmt = $this->prepare('SELECT * FROM rr ORDER by ds DESC;');
         $stmt->execute();
@@ -17,6 +34,35 @@ class SQLitePDO extends PDO {
             $url = "./displayPDF.php?ds={$row['ds']}";
             print "<a href=\"$url\">{$row['ds']}</a><br />\n";
         }
+    }
+    function yearTable($year){
+        $b = '';
+        $b .= '<section class="container-year">' . "\n";
+        $colCount = 5;
+        $stmt = $this->prepare('SELECT * FROM rr WHERE year= :year ORDER by ds DESC;');
+        $stmt->bindValue(':year',$year,PDO::PARAM_STR);
+        $stmt->execute();
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // print "<pre>\n";
+        // print_r($hash);
+        // print "</pre>\n";
+        $resultCount = count($result);
+        $rowsPerColumn = ($resultCount / $colCount);
+        $rowsPerColumn += (($resultCount % $colCount) == 0) ? 0 : 1;
+        $b .= "$resultCount reports found for $year<br>\n";
+        $chunks = array_chunk($result,$rowsPerColumn);
+        foreach($chunks as $chunk){
+            $b .= '<div class="container-year-column">' . "\n";
+            foreach($chunk as $row){
+                $url = "./displayPDF.php?ds={$row['ds']}";
+                // prettify the date,YYYYMMDD
+                $b .= "<a href=\"$url\">{$row['ds']}</a><br />\n";
+            }
+            $b .= '</div> <!-- column-container -->' . "\n";
+
+        }
+        $b .= '</section><!-- container-year -->' . "\n";
+        return $b;
     }
     function dsList(){
         $stmt = $this->prepare('SELECT ds FROM rr ORDER by ds DESC;');

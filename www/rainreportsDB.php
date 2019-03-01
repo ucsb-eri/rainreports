@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="description" content="Rainfall Reports - Santa Barbara County">
     <title>Rainfall Reports - Santa Barbara County</title>
-    <link rel="stylesheet" href="css/rainreports.css?v=1.0">
+    <link rel="stylesheet" href="css/rainreports.css?v=1.1">
     <style>
     </style>
 </head>
@@ -22,12 +22,19 @@ require_once('./settings.php');
 require_once('./inc/rainreportsDb.class.php');
 
 $pdo = new SQLitePDO(REPORTS_DB);
-$pdo->myq();
-$pdo->dsList();
-if ($pdo->inDsList('20190113')){
-    $pdo->fetchDs('20190113');
+$yearlist = $pdo->getYearList();
+foreach($yearlist as $year){
+    $buf .= $pdo->yearTable($year);
 }
-$pdo->inDsList('20180923');
+
+print $buf;
+
+// $pdo->myq();
+// $pdo->dsList();
+//if ($pdo->inDsList('20190113')){
+//    $pdo->fetchDs('20190113');
+//}
+//$pdo->inDsList('20180923');
 
 
 
