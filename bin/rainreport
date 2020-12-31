@@ -6,11 +6,9 @@ exe=`basename $executable`
 errs="/tmp/${exe}-errs.$$"
 debug=
 v=1
-url=http://www.countyofsb.org/uploadedFiles/pwd/Content/Water/Documents/rainfallreport.pdf
-curl=`command -v curl`
-wget=`command -v wget`
-[ -n "$wget" ] && type=wget
-[ -n "$curl" ] && type=curl
+type=
+#url=http://www.countyofsb.org/uploadedFiles/pwd/Content/Water/Documents/rainfallreport.pdf
+url=http://www.countyofsb.org/pwd/water/downloads/hydro/rainfallreports/rainfallreport.pdf
 
 RAINFALL_REPORTS_DIR=${RAINFALL_REPORTS_DIR:-~/rainfallreports}
 [ ! -d "${RAINFALL_REPORTS_DIR}" ] && mkdir "${RAINFALL_REPORTS_DIR}"
@@ -117,25 +115,40 @@ rfru_help(){
 
 }
 ################################################################################
+rfru_determineFetchType(){
+    curl=`command -v curl`
+    wget=`command -v wget`
+    [ -n "$wget" ] && type=wget
+    [ -n "$curl" ] && type=curl
+}
+################################################################################
+rfru_getDateStampFromFile(){
+    lpdf="$1"
+    updated=$(pdftotext -raw $lpdf - | egrep '^Updated ')
+    #echo "Updated: $updated"
+    wrongDateStamp=$(echo "$updated" | sed -e 's/^Updated [0-9]*[ap]m: //' -e 's/ Water Year.*$//')
+    m=$(echo "$wrongDateStamp" | cut -d/ -f1)
+    d=$(echo "$wrongDateStamp" | cut -d/ -f2)
+    y=$(echo "$wrongDateStamp" | cut -d/ -f3)
+    #echo "dscomponents: $y $m $d"
+    ds=$(printf '%04d%02d%02d' "$y" "$m" "$d")
+    echo "${ds}"
+}
+################################################################################
 rfru_fetch(){
     cd "${RAINFALL_REPORTS_DIR}"
     [ $? -eq 0 ] || { echo "failed to cd to dir: ${RAINFALL_REPORTS_DIR}"; exit 1; }
     tmp=./rainfall.tmp
+    rfru_determineFetchType
     case $type in
         curl)
             $curl --output $tmp $url > /dev/null 2>&1
             ;;
-        wget)
+        wget)  # never actually came up with a usage for wget
             ;;
     esac
-    updated=`pdftotext -raw $tmp - | egrep '^Updated '`
-    #echo "Updated: $updated"
-    wrongDateStamp=`echo "$updated" | sed -e 's/^Updated [0-9]*[ap]m: //' -e 's/ Water Year.*$//'`
-    m=`echo "$wrongDateStamp" | cut -d/ -f1`
-    d=`echo "$wrongDateStamp" | cut -d/ -f2`
-    y=`echo "$wrongDateStamp" | cut -d/ -f3`
-    #echo "dscomponents: $y $m $d"
-    ds=`printf '%04d%02d%02d' "$y" "$m" "$d"`
+
+    ds=$(rfru_getDateStampFromFile "${tmp}")
     dsname=rainfallreport-$ds.pdf
 
     [ -e "$dsname" ] && vecho "rainfallreport for $ds already exists." || { vecho "new rainfallreport $dsname fetched to ${RAINFALL_REPORTS_DIR}!"; mv $tmp $dsname; }
@@ -176,18 +189,26 @@ rfru_import(){
     [ -n "$db" -a -f "$db" ] || myExit 1 "db not set or doesn't exist, exiting"
     rfru_dbCheck
     for pdf in "$@"; do
+        decho "Processing file: ${pdf}"
         [ -f "$pdf" ] || { echo "$pdf not found"; continue; }
         # check to see if file is compressed, based purely on filename
-        echo "$pdf" | grep -q '.*\.pdf$'
+        echo "${pdf}" | grep -q '.*\.pdf$'
         origPDF=$?
         echo "$pdf" | grep -q '.*\.pdf.gz$'
         gzipped=$?
 
-        ds=`echo "$pdf" | sed -e 's/^.*\(20[12][0-9][0-9][0-9][0-9][0-9]\)\.pdf.*$/\1/'`
-        year=`echo "$pdf" | sed -e 's/^.*\(20[12][0-9]\)[0-9][0-9][0-9][0-9]\.pdf.*$/\1/'`
-        ymds=`echo "$pdf" | sed -e 's/^.*\(20[12][0-9][0-9][0-9]\)[0-9][0-9]\.pdf.*$/\1/'`
+        # should attempt to pull date info from PDF before resorting to using filename
+        ds=$(rfru_getDateStampFromFile "${pdf}")
+        [ -n "${ds}" ] || ds=$(echo "$pdf" | sed -e 's/^.*\(20[12][0-9][0-9][0-9][0-9][0-9]\)\.pdf.*$/\1/')
+        # If we cannot derive the ds from the PDF AND if the filename is not in the expected format, then we
+        # will have a long fliename here which is not viable.
+        # ie: when they changed the old URL, they left a short page documenting that, but it ended up with a yearstamp of the whole filename
+        year=$(echo "${ds}" | sed -e 's/^.*\(20[12][0-9]\)[0-9][0-9][0-9][0-9].*$/\1/')
+        ymds=$(echo "${ds}" | sed -e 's/^.*\(20[12][0-9][0-9][0-9]\)[0-9][0-9].*$/\1/')
 
-        if [ $gzipped ]; then
+        decho "ds: $ds, year: $year, ymds: $ymds"
+
+        if [ $gzipped ]; then   # gzipped actually means NOT gzipped
             if [ $origPDF ]; then
                 decho "file is PDF, needs gzipping"
                 pdfz="$pdf.gz"
@@ -208,6 +229,26 @@ rfru_import(){
     done
 }
 ################################################################################
+# need to decide how we are gonna derive the date, either reparse the PDF, or
+# rely on naming convention.
+################################################################################
+rfru_rename(){
+    # files are expected to be uncompressed
+    for pdf in "$@"; do
+        decho "Processing file: ${pdf}"
+        [ -f "$pdf" ] || { echo "$pdf not found"; continue; }
+
+        # should attempt to pull date info from PDF before resorting to using filename
+        ds=$(rfru_getDateStampFromFile "${pdf}")
+        [ -n "${ds}" ] || ds=$(echo "$pdf" | sed -e 's/^.*\(20[12][0-9][0-9][0-9][0-9][0-9]\)\.pdf.*$/\1/')
+
+        decho "ds: $ds, year: $year, ymds: $ymds"
+        dname=$(dirname ${pdf})
+        newname="${dname}/rainfallreport-$ds.pdf"
+        [ $newname = $pdf ] || { decho "mv ${pdf} ${newname}"; mv "${pdf}" "${newname}"; }
+    done
+}
+################################################################################
 v=1
 while [ $# -ge 1 ]; do
     case $1 in
@@ -216,6 +257,7 @@ while [ $# -ge 1 ]; do
         -d)                  debug=1 ;;
         --debug)             debug=1 ;;
         --db=*)              db=`echo "$1" | cut -d= -f2-` ;;
+        --type=*)            type=`echo "$1" | cut -d= -f2-` ;;
         --silent)            v= ;;
         --help)              rfru_help; myExit 1 ;;
         *)                   break ;;
@@ -233,11 +275,12 @@ fi
 case $subcommand in
     list)                 rfru_list ;;
     init)                 rfru_init ;;
-    fetch)                rfru_fetch ;;
-    gzip)                 rfru_gzip "$@" ;;
+    fetch)                rfru_fetch  "$@" ;;
+    gzip)                 rfru_gzip   "$@" ;;
     import)               rfru_import "$@" ;;
+    rename)               rfru_rename "$@" ;;
     status)               rfru_status ;;
-    help)                 rfru_help "$@" ;;
+    help)                 rfru_help   ;;
     *)                    rfru_help; myExit 1 ;;
 esac
 
