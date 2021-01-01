@@ -11,12 +11,11 @@
 <body>
     <script src="js/rainreports.js"></script>
     <h1>Santa Barbara County Rainfall Reports</h1>
-    <p>Harvested daily from:
-        <a href="http://www.countyofsb.org/uploadedFiles/pwd/Content/Water/Documents/rainfallreport.pdf">
-            http://www.countyofsb.org/uploadedFiles/pwd/Content/Water/Documents/rainfallreport.pdf</a><br />
-    </p>
 
 <?php
+$url="http://www.countyofsb.org/pwd/water/downloads/hydro/rainfallreports/rainfallreport.pdf";
+print "<p>Harvested daily from: <a href=\"$url\">$url</a><br /></p>\n";
+
 define('REPORTS_DIR','/home/rainreports/data/');
 foreach (glob(REPORTS_DIR . 'rainfallreport*.pdf',0) as $filename){
     $file = basename($filename);
