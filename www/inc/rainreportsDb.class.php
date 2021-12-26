@@ -38,7 +38,7 @@ class SQLitePDO extends PDO {
     function yearTable($year){
         $b = '';
         $b .= '<section class="container-year">' . "\n";
-        $colCount = 5;
+        $colCount = 12;
         $stmt = $this->prepare('SELECT * FROM rr WHERE year= :year ORDER by ds DESC;');
         $stmt->bindValue(':year',$year,PDO::PARAM_STR);
         $stmt->execute();

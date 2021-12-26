@@ -15,6 +15,9 @@ RAINFALL_REPORTS_DIR=${RAINFALL_REPORTS_DIR:-~/rainfallreports}
 [ ! -d "${RAINFALL_REPORTS_DIR}" ] && { echo "failed to create dir: ${RAINFALL_REPORTS_DIR}"; exit 1; }
 
 SQLITE=sqlite3
+log=/var/log/rainreports
+logds=$(date +'%Y%m%d-%H%M%S')
+
 
 ################################################################################
 myExit(){
@@ -49,6 +52,10 @@ eecho(){
 ################################################################################
 deecho(){
     [ -n "$debug" ] && eecho "$@" || return 0
+}
+################################################################################
+lecho(){
+    echo "# ${logds}:" "$@" >> ${log} || return 0
 }
 ################################################################################
 rfru_help(){
@@ -136,6 +143,7 @@ rfru_getDateStampFromFile(){
 }
 ################################################################################
 rfru_fetch(){
+    lecho "fetch subcommand"
     cd "${RAINFALL_REPORTS_DIR}"
     [ $? -eq 0 ] || { echo "failed to cd to dir: ${RAINFALL_REPORTS_DIR}"; exit 1; }
     tmp=./rainfall.tmp
@@ -151,6 +159,7 @@ rfru_fetch(){
     ds=$(rfru_getDateStampFromFile "${tmp}")
     dsname=rainfallreport-$ds.pdf
 
+    [ -e "$dsname" ] && lecho "rainfallreport for $ds already exists." || { lecho "new rainfallreport $dsname fetched to ${RAINFALL_REPORTS_DIR}!"; }
     [ -e "$dsname" ] && vecho "rainfallreport for $ds already exists." || { vecho "new rainfallreport $dsname fetched to ${RAINFALL_REPORTS_DIR}!"; mv $tmp $dsname; }
 
     # if we have specified a db file during fetch, go ahead and import into db as well
@@ -249,6 +258,7 @@ rfru_rename(){
     done
 }
 ################################################################################
+lecho "main"
 v=1
 while [ $# -ge 1 ]; do
     case $1 in
