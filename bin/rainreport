@@ -8,6 +8,11 @@ debug=
 v=1
 type=
 #url=http://www.countyofsb.org/uploadedFiles/pwd/Content/Water/Documents/rainfallreport.pdf
+# This first url is for the combined full water year
+# WY2021 runs from 2020-09-01 -> 2021-08-31
+# should download this file each day and sort out which water year it is and write the file 
+# out to a temp file change the file when the size of the file gets smaller
+urlfull='http://www.countyofsb.org/pwd/water/downloads/hydro/rainfallreports/rainfallreport(previous).pdf'
 url=http://www.countyofsb.org/pwd/water/downloads/hydro/rainfallreports/rainfallreport.pdf
 
 RAINFALL_REPORTS_DIR=${RAINFALL_REPORTS_DIR:-~/rainfallreports}
