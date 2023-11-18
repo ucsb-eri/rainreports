@@ -13,7 +13,11 @@ type=
 # should download this file each day and sort out which water year it is and write the file 
 # out to a temp file change the file when the size of the file gets smaller
 urlfull='http://www.countyofsb.org/pwd/water/downloads/hydro/rainfallreports/rainfallreport(previous).pdf'
-url=http://www.countyofsb.org/pwd/water/downloads/hydro/rainfallreports/rainfallreport.pdf
+url='http://www.countyofsb.org/pwd/water/downloads/hydro/rainfallreports/rainfallreport.pdf'
+urlfull='https://files.countyofsb.org/pwd/hydrology/rainfallreport(previous).pdf'
+url='https://files.countyofsb.org/pwd/hydrology/rainfallreport.pdf'
+urlfull='https://files.countyofsb.org/pwd/hydrology/Rainfall%20Reports/rainfallreport(previous).pdf'
+url='https://files.countyofsb.org/pwd/hydrology/Rainfall%20Reports/rainfallreport.pdf'
 
 RAINFALL_REPORTS_DIR=${RAINFALL_REPORTS_DIR:-~/rainfallreports}
 [ ! -d "${RAINFALL_REPORTS_DIR}" ] && mkdir "${RAINFALL_REPORTS_DIR}"
@@ -22,6 +26,7 @@ RAINFALL_REPORTS_DIR=${RAINFALL_REPORTS_DIR:-~/rainfallreports}
 SQLITE=sqlite3
 log=/var/log/rainreports
 logds=$(date +'%Y%m%d-%H%M%S')
+
 
 
 ################################################################################
@@ -263,6 +268,16 @@ rfru_rename(){
     done
 }
 ################################################################################
+rfru_wy(){
+    # use current date as a default
+    wyfullstamp=$(date +'%Y%m')
+    wyyy=$(date +'%Y')
+    wymm=$(date +'%m' | sed -e 's/^0//')
+    [ $wymm -gt 9 ] && ((wyyy)) 
+    wyds=${wyyy}
+    wyds+=$(printf "%02d" "${wymm}")
+}
+################################################################################
 lecho "main"
 v=1
 while [ $# -ge 1 ]; do
@@ -294,6 +309,7 @@ case $subcommand in
     gzip)                 rfru_gzip   "$@" ;;
     import)               rfru_import "$@" ;;
     rename)               rfru_rename "$@" ;;
+    wy)                   rfru_wy "$@" ;;
     status)               rfru_status ;;
     help)                 rfru_help   ;;
     *)                    rfru_help; myExit 1 ;;
