@@ -92,14 +92,12 @@ rfru_help(){
 
     subcommand_prefix="rfru_"
     if [ "$self" ]; then
-        sclist=`grep ')' $self | egrep "$subcommand_prefix" | grep -v '(' | cut -d ')' -f 1 | tr -d ' ' | grep -v '^[-*]'`
+        sclist=`grep ')' $self | grep -E "$subcommand_prefix" | grep -v '(' | cut -d ')' -f 1 | tr -d ' ' | grep -v '^[-*]'`
         echo "" > $thelp
         for sc in $sclist
         do
             printf "  $sc\n"
             #regex="'^#.*${subcommand_prefix}${sc}'"
-            #egrep -E $regex $self >> $thelp
-            #egrep -E $regex $self
             #echo "$regex"
         done
         cat $thelp
@@ -109,7 +107,7 @@ rfru_help(){
         longestsc=`echo "$sclist" | xargs -n1  -i sh -c 'echo \`echo -n {} | wc -c\`' | sort -n | tail -1`
         #echo "sclist $sclist, longestsc: $longestsc"
 
-        egrep "^# ${subcommand_prefix}" $self | sed -e "s/^# ${subcommand_prefix}//" > $thelp
+        grep -E "^# ${subcommand_prefix}" $self | sed -e "s/^# ${subcommand_prefix}//" > $thelp
     else
         echo "error finding self, PATH must not be set correctly"
     fi
@@ -141,7 +139,7 @@ rfru_determineFetchType(){
 ################################################################################
 rfru_getDateStampFromFile(){
     lpdf="$1"
-    updated=$(pdftotext -raw $lpdf - | egrep '^Updated ')
+    updated=$(pdftotext -raw $lpdf - | grep -E '^Updated ')
     #echo "Updated: $updated"
     wrongDateStamp=$(echo "$updated" | sed -e 's/^Updated [0-9]*[ap]m: //' -e 's/ Water Year.*$//')
     m=$(echo "$wrongDateStamp" | cut -d/ -f1)
